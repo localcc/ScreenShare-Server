@@ -26,6 +26,7 @@ void UdpServer::Run() {
             }
             case ENET_EVENT_TYPE_RECEIVE: {
                 this->HandlePacket(event);
+                enet_packet_destroy(event.packet);
                 break;
             }
             case ENET_EVENT_TYPE_DISCONNECT: {
