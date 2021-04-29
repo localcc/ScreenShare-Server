@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option optimize_for = LITE_RUNTIME;
+
+package network.packets;
+
+message Login {
+    string UserId = 1;
+}

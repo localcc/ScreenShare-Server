@@ -1,6 +1,5 @@
 #include <network/UdpServer.h>
-
-#include <network/packets/LoginPacket.h>
+#include <proto/Login.pb.h>
 #include <iostream>
 
 UdpServer::UdpServer(std::string &host, uint16_t port, int32_t maxConnections, int32_t maxIn, int32_t maxOut, std::function<std::string()> genId) :
@@ -47,8 +46,15 @@ void UdpServer::HandleLogin(ENetEvent event) {
     auto id = this->genId();
     const auto cStr = id.c_str();
     event.peer->data = reinterpret_cast<void *>(const_cast<char *>(cStr));
-    LoginPacket loginPacket{.clientId = cStr};
-    auto *packet = enet_packet_create(&loginPacket, sizeof(LoginPacket), 0);
+
+    auto* loginPacket = new network::packets::Login();
+    loginPacket->set_userid(id);
+    const auto size = loginPacket->ByteSizeLong();
+
+    auto* bytes = new uint8_t[size];
+    loginPacket->SerializeToArray(bytes, size);
+
+    auto *packet = enet_packet_create(bytes, size, 0);
     enet_peer_send(event.peer, 0, packet);
 
     this->clients.emplace(id,
@@ -61,7 +67,7 @@ void UdpServer::HandleLogin(ENetEvent event) {
 
 void UdpServer::HandlePacket(ENetEvent event) {
     const auto packetId = event.packet->data[0];
-    std::cout << packetId << std::endl;
+    std::cout << "Packet id: " << static_cast<int32_t>(packetId) << std::endl;
 }
 
 

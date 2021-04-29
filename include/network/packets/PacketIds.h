@@ -1,1 +1,0 @@
-#define LOGIN_PACKET_ID 0
