@@ -55,10 +55,11 @@ void UdpServer::HandleLogin(ENetEvent event) {
     loginPacket->set_userid(id);
     const auto size = loginPacket->ByteSizeLong();
 
-    auto* bytes = new uint8_t[size];
-    loginPacket->SerializeToArray(bytes, size);
+    auto* bytes = new uint8_t[size + 1];
+    bytes[0] = PacketIds::Login;
+    loginPacket->SerializeToArray(bytes, size + 1);
 
-    auto *packet = enet_packet_create(bytes, size, 0);
+    auto *packet = enet_packet_create(bytes, size + 1, 0);
     enet_peer_send(event.peer, 0, packet);
 
     this->clients.emplace(id,
@@ -67,6 +68,9 @@ void UdpServer::HandleLogin(ENetEvent event) {
                                   std::unique_ptr<ENetPeer, decltype(&enet_peer_reset)>(
                                           event.peer,
                                           &enet_peer_reset)));
+
+    delete loginPacket;
+    delete[] bytes;
 }
 
 void UdpServer::HandlePacket(ENetEvent event) {
