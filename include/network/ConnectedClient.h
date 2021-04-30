@@ -23,6 +23,8 @@ public:
     void addWatchingMe(const std::string& id);
     void removeWatchingMe(const std::string& id);
 
+    void notifyDisconnect(const std::string& id);
+
     [[nodiscard]] std::vector<std::string> getWatchedByMe() const;
     [[nodiscard]] std::vector<std::string> getWatchingMe() const;
 

@@ -7,5 +7,5 @@ enum PacketIds {
     StopWatching = 3,
     StartStreaming = 4,
     StopStreaming = 5,
-
+    ClientDisconnected = 6,
 };

@@ -1,4 +1,6 @@
 #include <network/ConnectedClient.h>
+#include <proto/ClientDisconnected.pb.h>
+#include <network/PacketIds.h>
 
 ConnectedClient::ConnectedClient(std::string &id, std::unique_ptr<ENetPeer, decltype(&enet_peer_reset)> peer) :
         id(id), peer(std::move(peer)) {
@@ -46,4 +48,20 @@ void ConnectedClient::stopStreaming() {
 
 [[nodiscard]] bool ConnectedClient::getStreaming() const {
     return this->streaming;
+}
+
+void ConnectedClient::notifyDisconnect(const std::string &id) {
+    auto* disconnectProto = new network::packets::ClientDisconnected();
+    disconnectProto->set_id(id);
+
+    const auto size = disconnectProto->ByteSizeLong();
+    uint8_t* data = new uint8_t[size + 1];
+    data[0] = PacketIds::ClientDisconnected;
+    disconnectProto->SerializeToArray(data + 1, size);
+
+    ENetPacket* packet = enet_packet_create(data, size + 1, 0);
+    enet_peer_send(this->peer.get(), 0, packet);
+
+    delete disconnectProto;
+    delete[] data;
 }

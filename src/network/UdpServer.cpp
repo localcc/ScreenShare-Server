@@ -80,10 +80,11 @@ void UdpServer::HandlePacket(ENetEvent event) {
                 clientInfo->set_streaming(client.second->getStreaming());
             }
             const auto size = clientsInfo->ByteSizeLong();
-            uint8_t* data = new uint8_t[size];
-            clientsInfo->SerializeToArray(data, size);
+            uint8_t* data = new uint8_t[size + 1];
+            data[0] = PacketIds::GetClients;
+            clientsInfo->SerializeToArray(data, size + 1);
 
-            ENetPacket* packet = enet_packet_create(data, size, 0);
+            ENetPacket* packet = enet_packet_create(data, size + 1, 0);
             enet_peer_send(event.peer, 0, packet);
             break;
         }
@@ -179,8 +180,17 @@ void UdpServer::HandlePacket(ENetEvent event) {
 
 
 void UdpServer::HandleDisconnect(ENetEvent event) {
-    auto id = reinterpret_cast<char*>(event.peer->data);
-    if(id == nullptr) return;
+    if(event.peer->data == nullptr) return;
+    auto id = std::string(reinterpret_cast<char*>(event.peer->data));
+    auto client = this->clients.find(id);
+    if(client == this->clients.end()) return;
+    const auto watching = client->second->getWatchingMe();
+    for(const auto& watchingClientId : watching) {
+        const auto watchingClient = this->clients.find(watchingClientId);
+        if(watchingClient == this->clients.end()) continue;
+        watchingClient->second->removeWatchedByMe(id);
+        watchingClient->second->notifyDisconnect(id);
+        client->second->removeWatchingMe(watchingClientId);
+    }
     if(this->clients.erase(id) == 0) return;
-    //todo: tell other clients about disconnect
 }
