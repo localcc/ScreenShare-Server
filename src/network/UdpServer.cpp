@@ -51,16 +51,17 @@ void UdpServer::HandleLogin(ENetEvent event) {
     const auto cStr = id.c_str();
     event.peer->data = reinterpret_cast<void *>(const_cast<char *>(cStr));
 
-    auto* loginPacket = new network::packets::Login();
-    loginPacket->set_userid(id);
-    const auto size = loginPacket->ByteSizeLong();
+    auto loginPacket = network::packets::Login();
+    loginPacket.set_userid(id);
+    const auto size = loginPacket.ByteSizeLong();
 
     auto* bytes = new uint8_t[size + 1];
     bytes[0] = PacketIds::Login;
-    loginPacket->SerializeToArray(bytes, size + 1);
+    loginPacket.SerializeToArray(bytes, size + 1);
 
     auto *packet = enet_packet_create(bytes, size + 1, 0);
     enet_peer_send(event.peer, 0, packet);
+    delete[] bytes;
 
     this->clients.emplace(id,
                           std::make_unique<ConnectedClient>(
@@ -69,27 +70,26 @@ void UdpServer::HandleLogin(ENetEvent event) {
                                           event.peer,
                                           &enet_peer_reset)));
 
-    delete loginPacket;
-    delete[] bytes;
 }
 
 void UdpServer::HandlePacket(ENetEvent event) {
     const auto packetId = static_cast<PacketIds>(event.packet->data[0]);
     switch(packetId) {
         case GetClients: {
-            auto clientsInfo = new network::packets::ClientsInfo();
+            auto clientsInfo = network::packets::ClientsInfo();
             for (const auto &client : this->clients)  {
-                auto clientInfo = clientsInfo->add_clients();
+                auto clientInfo = clientsInfo.add_clients();
                 clientInfo->set_id(client.second->getId());
                 clientInfo->set_streaming(client.second->getStreaming());
             }
-            const auto size = clientsInfo->ByteSizeLong();
+            const auto size = clientsInfo.ByteSizeLong();
             uint8_t* data = new uint8_t[size + 1];
             data[0] = PacketIds::GetClients;
-            clientsInfo->SerializeToArray(data, size + 1);
+            clientsInfo.SerializeToArray(data, size + 1);
 
             ENetPacket* packet = enet_packet_create(data, size + 1, 0);
             enet_peer_send(event.peer, 0, packet);
+            delete[] data;
             break;
         }
         case StartWatching: {

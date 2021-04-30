@@ -51,17 +51,16 @@ void ConnectedClient::stopStreaming() {
 }
 
 void ConnectedClient::notifyDisconnect(const std::string &id) {
-    auto* disconnectProto = new network::packets::ClientDisconnected();
-    disconnectProto->set_id(id);
+    auto disconnectProto = network::packets::ClientDisconnected();
+    disconnectProto.set_id(id);
 
-    const auto size = disconnectProto->ByteSizeLong();
+    const auto size = disconnectProto.ByteSizeLong();
     uint8_t* data = new uint8_t[size + 1];
     data[0] = PacketIds::ClientDisconnected;
-    disconnectProto->SerializeToArray(data + 1, size);
+    disconnectProto.SerializeToArray(data + 1, size);
 
     ENetPacket* packet = enet_packet_create(data, size + 1, 0);
     enet_peer_send(this->peer.get(), 0, packet);
 
-    delete disconnectProto;
     delete[] data;
 }
