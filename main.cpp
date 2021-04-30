@@ -4,9 +4,13 @@
 #include <random>
 #include <network/UdpServer.h>
 #include <sstream>
+#include <proto/Login.pb.h>
 #include <cstdlib>
 
 int main(int argc, char* argv[]) {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+
     if(argc != 3) {
         std::cout << "Invalid arguments!" << std::endl;
         std::cout << "Usage: [HOST] [PORT]" << std::endl;
@@ -41,5 +45,7 @@ int main(int argc, char* argv[]) {
         return id.str();
     });
     server.Start();
+
+    google::protobuf::ShutdownProtobufLibrary();
     return 0;
 }

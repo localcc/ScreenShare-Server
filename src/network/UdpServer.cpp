@@ -1,5 +1,9 @@
 #include <network/UdpServer.h>
 #include <proto/Login.pb.h>
+#include <network/PacketIds.h>
+#include <proto/ClientsInfo.pb.h>
+#include <proto/StartWatching.pb.h>
+#include <proto/StopWatching.pb.h>
 #include <iostream>
 
 UdpServer::UdpServer(std::string &host, uint16_t port, int32_t maxConnections, int32_t maxIn, int32_t maxOut, std::function<std::string()> genId) :
@@ -66,7 +70,110 @@ void UdpServer::HandleLogin(ENetEvent event) {
 }
 
 void UdpServer::HandlePacket(ENetEvent event) {
-    const auto packetId = event.packet->data[0];
+    const auto packetId = static_cast<PacketIds>(event.packet->data[0]);
+    switch(packetId) {
+        case GetClients: {
+            auto clientsInfo = new network::packets::ClientsInfo();
+            for (const auto &client : this->clients)  {
+                auto clientInfo = clientsInfo->add_clients();
+                clientInfo->set_id(client.second->getId());
+                clientInfo->set_streaming(client.second->getStreaming());
+            }
+            const auto size = clientsInfo->ByteSizeLong();
+            uint8_t* data = new uint8_t[size];
+            clientsInfo->SerializeToArray(data, size);
+
+            ENetPacket* packet = enet_packet_create(data, size, 0);
+            enet_peer_send(event.peer, 0, packet);
+            break;
+        }
+        case StartWatching: {
+            if(event.peer->data == nullptr) {
+                std::cerr << "Unauthenticated client tried to send a packet, dropping" << std::endl;
+                break;
+            }
+            if(event.packet->dataLength <= 2) break;
+            auto watchingProto = network::packets::StartWatching();
+            if(!watchingProto.ParseFromArray(event.packet->data + 1, event.packet->dataLength - 1)) {
+                std::cerr << "Failed to parse StartWatching packet for clientId: " << reinterpret_cast<char*>(event.peer->data) << std::endl;
+                break;
+            }
+
+            const auto issuerId = std::string(reinterpret_cast<char*>(event.peer->data));
+            const auto watchedId = watchingProto.id();
+
+            auto srcFind = this->clients.find(issuerId);
+            if(srcFind == this->clients.end()) break;
+            auto dstFind = this->clients.find(watchedId);
+            if(dstFind == this->clients.end()) break;
+            if(!dstFind->second->getStreaming()) {
+                std::cerr << "Client " << issuerId << " tried to watch stream of a client " << watchedId << " that is not streaming" << std::endl;
+                break;
+            }
+            srcFind->second->addWatchedByMe(watchedId);
+            dstFind->second->addWatchingMe(issuerId);
+
+            break;
+        }
+        case StopWatching: {
+            if(event.peer->data == nullptr) {
+                std::cerr << "Unauthenticated client tried to send a packet, dropping" << std::endl;
+                break;
+            }
+            if(event.packet->dataLength <= 2) break;
+            auto watchingProto = network::packets::StopWatching();
+            if(!watchingProto.ParseFromArray(event.packet->data + 1, event.packet->dataLength - 1)) {
+                std::cerr << "Failed to parse StopWatching packet for clientId: " << reinterpret_cast<char*>(event.peer->data) << std::endl;
+                break;
+            }
+
+            const auto issuerId = std::string(reinterpret_cast<char*>(event.peer->data));
+            const auto watchedId = watchingProto.id();
+
+            auto srcFind = this->clients.find(issuerId);
+            if(srcFind == this->clients.end()) {
+                srcFind->second->removeWatchedByMe(watchedId);
+            }
+            auto dstFind = this->clients.find(watchedId);
+            if(dstFind != this->clients.end()) {
+                dstFind->second->removeWatchingMe(issuerId);
+            }
+
+            break;
+        }
+        case StartStreaming: {
+            if(event.peer->data == nullptr) break;
+
+            const auto search = this->clients.find(reinterpret_cast<char*>(event.peer->data));
+            if(search == this->clients.end()) {
+                std::cerr << "Unauthenticated client tried to send a packet, dropping" << std::endl;
+                break;
+            }
+
+            search->second->startStreaming();
+            break;
+        }
+        case StopStreaming: {
+            if(event.peer->data == nullptr) break;
+
+            const auto issuerId = std::string(reinterpret_cast<char*>(event.peer->data));
+            const auto search = this->clients.find(issuerId);
+            if(search == this->clients.end()) {
+                std::cerr << "Unauthenticated client tried to send a packet, dropping" << std::endl;
+                break;
+            }
+
+            search->second->stopStreaming();
+            const auto watching = search->second->getWatchingMe();
+            for(const auto& watchingClientId : watching) {
+                const auto watchingClient = this->clients.find(watchingClientId);
+                if(watchingClient == this->clients.end()) continue;
+                watchingClient->second->removeWatchedByMe(issuerId);
+                search->second->removeWatchingMe(watchingClientId);
+            }
+            break;
+        }
+    }
     std::cout << "Packet id: " << static_cast<int32_t>(packetId) << std::endl;
 }
 

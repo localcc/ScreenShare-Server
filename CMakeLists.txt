@@ -12,7 +12,7 @@ find_package(Protobuf REQUIRED)
 
 file(GLOB PROTO_FILES ${PROTO_PATH}/*.proto)
 add_executable(ScreenShare_Server main.cpp include/network/UdpServer.h src/network/UdpServer.cpp
-        include/network/EnetHelper.h include/network/ConnectedClient.h src/network/ConnectedClient.cpp)
+        include/network/EnetHelper.h include/network/ConnectedClient.h src/network/ConnectedClient.cpp include/network/PacketIds.h)
 foreach(proto ${PROTO_FILES})
     target_sources(ScreenShare_Server PRIVATE ${proto})
 endforeach(proto)

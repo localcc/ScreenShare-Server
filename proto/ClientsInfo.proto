@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option optimize_for = LITE_RUNTIME;
+
+package network.packets;
+
+message ClientsInfo {
+    repeated ClientInfo Clients = 1;
+}
+
+message ClientInfo {
+    string Id = 1;
+    bool Streaming = 2;
+}
